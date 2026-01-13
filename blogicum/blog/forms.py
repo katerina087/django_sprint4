@@ -5,16 +5,7 @@ from .models import Post, Comment, User
 class PostForm(forms.ModelForm):
     class Meta:
         model = Post
-        # Явно указываем все нужные поля вместо exclude
-        fields = [
-            'title',
-            'text',
-            'category',
-            'location',
-            'pub_date',
-            'is_published',
-            'image'
-        ]
+        exclude = ('author',)
         widgets = {
             'pub_date': forms.DateTimeInput(attrs={
                 'type': 'datetime-local',
@@ -23,16 +14,12 @@ class PostForm(forms.ModelForm):
             'is_published': forms.CheckboxInput(
                 attrs={'class': 'form-check-input'}
             ),
+            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
         help_texts = {
             'is_published': 'Отметьте, чтобы опубликовать пост',
+            'image': 'Загрузите изображение (JPG, PNG, GIF)',
         }
-
-    image = forms.ImageField(
-        required=False,
-        widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
-        help_text='Загрузите изображение (JPG, PNG, GIF)'
-    )
 
 
 class CommentForm(forms.ModelForm):
