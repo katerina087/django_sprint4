@@ -9,15 +9,18 @@ from .forms import UserForm, PostForm, CommentForm
 
 
 # Вспомогательные функции
-def get_posts_with_comments(**kwargs):
-    """Получение постов с количеством комментариев"""
+def get_posts(**kwargs):
+    """Получение отфильтрованных постов без комментариев"""
     return Post.objects.select_related(
         'category',
         'location',
         'author'
-    ).annotate(
-        comment_count=Count('comments')
     ).filter(**kwargs).order_by('-pub_date')
+
+
+def add_comment_count_to_posts(queryset):
+    """Добавление количества комментариев к постам"""
+    return queryset.annotate(comment_count=Count('comments'))
 
 
 def get_paginated_page(request, queryset, items_per_page=10):
@@ -29,37 +32,35 @@ def get_paginated_page(request, queryset, items_per_page=10):
 
 def index(request):
     """Главная страница"""
-    posts = get_posts_with_comments(
+    posts = get_posts(
         pub_date__lte=timezone.now(),
         is_published=True,
         category__is_published=True
     )
-
-    page_obj = get_paginated_page(request, posts)
+    posts_with_comments = add_comment_count_to_posts(posts)
+    page_obj = get_paginated_page(request, posts_with_comments)
     context = {'page_obj': page_obj}
     return render(request, "blog/index.html", context)
 
 
 def post_detail(request, post_id):
     """Отображение полного описания выбранной публикации"""
-    posts = get_posts_with_comments(id=post_id)
+    posts = get_posts(id=post_id)
+    posts_with_comments = add_comment_count_to_posts(posts)
 
     if request.user.is_authenticated:
-        # Для авторизованных пользователей
-        post = get_object_or_404(posts, id=post_id)
+        post = get_object_or_404(posts_with_comments, id=post_id)
         if request.user != post.author:
-            # Если не автор, проверяем публикацию
             post = get_object_or_404(
-                posts,
+                posts_with_comments,
                 id=post_id,
                 is_published=True,
                 category__is_published=True,
                 pub_date__lte=timezone.now()
             )
     else:
-        # Для анонимных пользователей только опубликованное
         post = get_object_or_404(
-            posts,
+            posts_with_comments,
             id=post_id,
             is_published=True,
             category__is_published=True,
@@ -85,13 +86,15 @@ def category_posts(request, category_slug):
         is_published=True
     )
 
-    posts = get_posts_with_comments(
+    posts = get_posts(
         category=category,
         is_published=True,
         pub_date__lte=timezone.now()
     )
 
-    page_obj = get_paginated_page(request, posts)
+    posts_with_comments = add_comment_count_to_posts(posts)
+
+    page_obj = get_paginated_page(request, posts_with_comments)
     context = {
         'category': category,
         'page_obj': page_obj,
@@ -105,18 +108,18 @@ def profile(request, username):
 
     # Определяем, какие посты показывать
     if request.user != profile_user:
-        # Для чужих профилей показываем только опубликованные посты
-        posts = get_posts_with_comments(
+        posts = get_posts(
             is_published=True,
             category__is_published=True,
             pub_date__lte=timezone.now(),
             author=profile_user
         )
     else:
-        # Для своего профиля показываем все посты
-        posts = get_posts_with_comments(author=profile_user)
+        posts = get_posts(author=profile_user)
 
-    page_obj = get_paginated_page(request, posts)
+    posts_with_comments = add_comment_count_to_posts(posts)
+
+    page_obj = get_paginated_page(request, posts_with_comments)
 
     context = {
         'profile': profile_user,
